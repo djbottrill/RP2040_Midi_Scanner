@@ -94,4 +94,4 @@ Midi Scanner based on the Raspberry Pi Pico
   * ethernet.maintain() is executed every 100mS as per guidelines this ensures DHCP renews seamlessly
   * The code is distributed better over both cores of the RP2040 with most of the housekkeeping and I/O running on core 0
     and the keyboard, piston and analogue controller scanning running on core 1
-  
+   
