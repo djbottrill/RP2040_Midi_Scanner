@@ -11,7 +11,7 @@ Midi Scanner based on the Raspberry Pi Pico
   the default settings section if required.
   
   The hardware is designed to connect the boards via a 10 way ribbon cable with odd cables being ground. The hardare has been tested
-  with ribbon cables of uo to 4M length without problems, I2C pullup resistors of 10K ohms and fitted on each scanner board.
+  with ribbon cables of up to 4M length without problems, I2C pullup resistors of 10K ohms and fitted on each scanner board.
   
   I2C protocol polls slave devices for 2 bytes at a time if the buffer is empty the slave returns
   the Midi channel and information about the slave type.
@@ -46,22 +46,23 @@ Midi Scanner based on the Raspberry Pi Pico
   the buffer will be emptied on the slave scanner before moving onto the next slave scanner.
   
   Asynchronously any received Midi commands are transmitted over IPMidi in a single 
-  multicast packet of variable size up to the maximum set by UDP_TX_PACKET_MAX_SIZE and the midi buffer has been emptied.
+  multicast packet of variable size up to the maximum set by UDP_TX_PACKET_MAX_SIZE which is sufficient to completely empty the midi buffer.
+  
   The UDP destination port is 21928 which equates to the first IP Midi port, this can be changed
-  by the setting destport = 21929 etc.
+  by the setting destport = 21929 for IPMidi port 2 etc.
   
   The scanner uses a Wiznet W5500 compatible Ethernet adapter. 
   
   The master scanner will listen to IPMidi broadcasts and will update any Illuminated pistons by sending I2C commands   
-  to the relevant slave.
+  back to the relevant slave.
   
-  If no Ethernet hardware is found or there is no ethernet cable is connected or the adapater fails to obtain and IP address via DHCP
-  then the board will fallback to USB Midi and will pause with the on-board LED flashing with a short on and a long off flash until
+  If no Ethernet hardware is found or if no ethernet cable is connected or the adapater fails to obtain and IP address via DHCP
+  then the board will fallback to USB Midi and will pause with the on-board LED flashing with a short on and a long off period until
   the Midi port is connected.
   
   At boot time the board waits for 5 seconds during which time the on-board LED will flash, if a USB Serial connection
   is made during this time then the board will go into diagnostic (debug) mode allowing for changes to settings to be made 
-  and saved to EEPROM and in addition during operation debug messages will be send to the serial console.
+  and saved to EEPROM, in addition during operation debug messages will be sent to the serial console.
   
   Once Setup has competed the on-board LED will go out and will flash briefly for each midi event processed. 
    
@@ -76,7 +77,7 @@ Midi Scanner based on the Raspberry Pi Pico
   a tangent calculation to convert pedal height to pedal angle.
   
   The board should be compiled using the excellent arduino-pico core: https://github.com/earlephilhower/arduino-pico 
-  remember to configure the compiler to use the Adafruit Tiny USB stack instead of the default Pico SDK USB Stack else the compiler 
+  remember to configure the compiler to use the Adafruit Tiny USB stack instead of the default Pico SDK USB Stack else compilation 
   will fail.
   
   Both microcontroller cores of the RP2040 are used, the code is split between the microcontroller cores in an attempt to maximise
