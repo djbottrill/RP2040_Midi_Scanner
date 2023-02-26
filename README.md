@@ -16,9 +16,13 @@ Midi Scanner based on the Raspberry Pi Pico
   velocity is always assumed to be 127 although this default can be changed.
   The first byte is organised as follows:
   00        NooP returns Midi channel in the fist byte and the scanner capabilites in the second byte
+  
   10 - 3F - Midi controller NPRN command the first 4 are reserved for swell channels and the rest Illuminated Pistons
+  
   40 -      Midi note off command, note is in the second byte
+  
   41 -      Midi note on commnand, note is in the second byte
+  
   42 -      Midi programe change command, program number is in the second byte, this is no longer used in this version
   If the MSB is set this indicates that there are further Midi commands in the send buffer
   Sending 0 , 0 to a remote device will reset it's buffer
