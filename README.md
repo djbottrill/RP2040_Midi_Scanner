@@ -30,7 +30,7 @@ Midi Scanner based on the Raspberry Pi Pico
   
   41      Midi note on commnand, note is in the second byte
   
-  42      Midi programe change command, program number is in the second byte, this is no longer used in this version.
+  42     Midi programe change command, program number is in the second byte, this is no longer used in this version.
   
   If the MSB is set this indicates that there are further Midi commands in the send buffer
   
