@@ -5,7 +5,7 @@ Midi Scanner based on the Raspberry Pi Pico
   IPMidi or USBMidi Master/Slave scanner for Raspberry Pi Pico board uses I2C BUS to connect multiple slave scanners
   boards can be programmed to be either a Master or slave, the master board can also be used as a keyboard or piston scanner. 
   
-  This is designed to be compatible and complement digital pipe organes based on GrandOrgue or Hauptwerk.
+  This is designed to be compatible and complement digital pipe organs based on GrandOrgue or Hauptwerk.
   
   The I2C bus is configured to run at 4MHz to reduce latency and the polling interval can be changed in 
   the default settings section if required.
