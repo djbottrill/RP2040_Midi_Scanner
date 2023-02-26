@@ -64,7 +64,7 @@ Midi Scanner based on the Raspberry Pi Pico
   
   V7.1.0
   * Many bugfixes and improvements
-  * Waits for 5 seconds for USB serial to connect at boot time  
+  * Waits for 5 seconds for USB serial to connect at boot time in order to enter debug / congigure mode
   * If an NRPN control change message is received by the master this will trigger a re-scan of any analogue controllers on all boards
   * USB Midi now handles NRPN messages  
   * The hardware I2C bus reset line (GPIO 22) has been removed the master now just sends I2C scan stop and restart commands to the slaves
