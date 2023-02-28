@@ -84,6 +84,23 @@ Midi Scanner based on the Raspberry Pi Pico
   Both microcontroller cores of the RP2040 are used, the code is split between the microcontroller cores in an attempt to maximise
   performance.
   
+  I2C BUS PINOUTS (10 way ribbon cable):
+
+  Pin 1 +5V
+  Pin 3 +5V
+  Pin 5 Console relay driven by GPIO 22 on master scanner, previously used as a reset (run) signal on slaves
+  Pin 7 I2C SDA
+  Pin 9 I2C SCL
+
+  Pins 2, 4, 6, 8 & 10 are connected to 0V (ground)
+
+  V7.1.1
+  * Various minor code improvements
+  * GPIO 22 which had been used as a reset line for the slave controllers has now been repurposed as a relay driver output
+    on the master controller such that pressing any key or piston will turn on a relay which can be used to control console lighting.
+    The relay has a 5 minute re-triggerable timer
+  * The analogue controller scan function has now been moved to Core 1 for consitency
+  
   V7.1.0
   * Many bugfixes and improvements
   * Waits for 5 seconds for USB serial to connect at boot time in order to enter debug / congigure mode
