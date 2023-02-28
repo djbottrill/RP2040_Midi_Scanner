@@ -1,76 +1,96 @@
 /*
-  (C) 2019-2023 David J Bottrill, Shady Grove Electronics
+ Midi Scanner based on the Raspberry Pi Pico
+(C) 2019-2023 David J Bottrill, Shady Grove Electronics
 
-  IPMidi or USBMidi Master/Slave scanner for Raspberry Pi Pico board uses I2C BUS to connect multiple slave scanners
-  boards can be programmed to be either a Master or slave, the master board can also be used as a keyboard or piston scanner. 
-  This is designed to be compatible and complement digital pipe organes based on GrandOrgue or Hauptwerk.
+IPMidi or USBMidi Master/Slave scanner for Raspberry Pi Pico board uses I2C BUS to connect multiple slave scanners
+boards can be programmed to be either a Master or slave, the master board can also be used as a keyboard or piston scanner. 
+This is designed to be compatible and complement digital pipe organs based on GrandOrgue or Hauptwerk.
+The I2C bus is configured to run at 4MHz to reduce latency and the polling interval can be changed in 
+the default settings section if required.
+The hardware is designed to connect the boards via a 10 way ribbon cable with odd cables being ground. The hardare has been tested
+with ribbon cables of up to 4M length without problems, I2C pullup resistors of 10K ohms and fitted on each scanner board.
+  
+I2C protocol polls slave devices for 2 bytes at a time if the buffer is empty the slave returns
+the Midi channel and information about the slave type.
+If there is Midi data then this is also encoded in 2 bytes.
+velocity is always assumed to be 127 although this default can be changed.
 
-  The I2C bus is configured to run at 4MHz to reduce latency and the polling interval can be changed in 
-  the default settings section if required.
-  The hardware is designed to connect the boards via a 10 way ribbon cable with odd cables being ground. The hardare has been tested
-  with ribbon cables of uo to 4M length without problems, I2C pullup resistors of 10K ohms and fitted on each scanner board.
+The first byte is organised as follows:
+00      - NooP returns Midi channel in the first byte and the scanner capabilites in the second byte
+10 - 3F - Midi controller NPRN command the first 4 are reserved for swell channels and the rest Illuminated Pistons 
+40      - Midi note off command, note is in the second byte
+41      - Midi note on commnand, note is in the second byte
+42      - Midi programe change command, program number is in the second byte, this is no longer used in this version.
+  
+If the MSB is set this indicates that there are further Midi commands in the send buffer 
+Sending 0 , 0 to a remote device will reset it's buffer 
+Sending 1 , 0 to a remote device will enable scanning and force a re-scan of any conneted analogue controllers.
+The above is only used to initially assess the remote devices' capabilities and then start them scanning.
+  
+If the I2C bus address on the board is configured as 0 the board will configure itself as a master scanner
+there can be only one Master scanner on the bus, all other boards must be configured as slaves.  
+The master scanner will poll each remote device in ascending order of I2C address
+the buffer will be emptied on the slave scanner before moving onto the next slave scanner. 
+Asynchronously any received Midi commands are transmitted over IPMidi in a single multicast packet of variable size 
+up to the maximum set by UDP_TX_PACKET_MAX_SIZE which is sufficient to completely empty the midi buffer.
+The UDP destination port is 21928 which equates to the first IP Midi port, this can be changed
+by the setting destport = 21929 for IPMidi port 2 etc.
+  
+The scanner uses a Wiznet W5500 compatible Ethernet adapter. 
+The master scanner will listen to IPMidi broadcasts and will update any Illuminated pistons by sending I2C commands   
+back to the relevant slave.
+If no Ethernet hardware is found or if no ethernet cable is connected or the adapater fails to obtain and IP address via DHCP
+then the board will fallback to USB Midi and will pause with the on-board LED flashing with a short on and a long off period until
+the Midi port is connected. 
 
-  I2C protocol polls slave devices for 2 bytes at a time if the buffer is empty the slave returns
-  the Midi channel and information about the slave type.
-  If there is Midi data then this is also encoded in 2 bytes.
-  velocity is always assumed to be 127 although this default can be changed.
-  The first byte is organised as follows:
-  00        NooP returns Midi channel in the fist byte and the scanner capabilites in the second byte
-  10 - 3F - Midi controller NPRN command the first 4 are reserved for swell channels and the rest Illuminated Pistons
-  40 -      Midi note off command, note is in the second byte
-  41 -      Midi note on commnand, note is in the second byte
-  42 -      Midi programe change command, program number is in the second byte, this is no longer used in this version
-  If the MSB is set this indicates that there are further Midi commands in the send buffer
-
-  Sending 0 , 0 to a remote device will reset it's buffer
-  Sending 1 , 0 to a remote device will enable scanning and force a re-scan of any conneted analogue controllers.
-  The above is only used to initially assess the remote devices' capabilities and then start them scanning.
-
-  If the I2C bus address on the board is configured as 0 the board will configure itself as a master scanner
-  there can be only one Master scanner on the bus, all other boards must be configured as slaves.
-  The master scanner will poll each remote device in ascending order of I2C address
-  the buffer will be emptied on the slave scanner before moving onto the next slave scanner.
-  Asynchronously any received Midi commands are transmitted over IPMidi in a single 
-  multicast packet of variable size up to the maximum set by UDP_TX_PACKET_MAX_SIZE and the midi buffer has been emptied.
-  The UDP destination port is 21928 which equates to the first IP Midi port, this can be changed
-  by the setting destport = 21929 etc.
-  The scanner uses a Wiznet W5500 compatible Ethernet adapter. 
-  The master scanner will listen to IPMidi broadcasts and will update any Illuminated pistons by sending I2C commands   
-  to the relevant slave.
-  If no Ethernet hardware is found or there is no ethernet cable is connected or the adapater fails to obtain and IP address via DHCP
-  then the board will fallback to USB Midi and will pause with the on-board LED flashing with a short on and a long off flash until
-  the Midi port is connected.
-  At boot time the board waits for 5 seconds during which time the on-board LED will flash, if a USB Serial connection
-  is made during this time then the board will go into diagnostic (debug) mode allowing for changes to settings to be made 
-  and saved to EEPROM and in addition during operation debug messages will be send to the serial console.
-  Once Setup has competed the on-board LED will go out and will flash briefly for each midi event processed. 
+At boot time the board waits for 5 seconds during which time the on-board LED will flash, if a USB Serial connection
+is made during this time then the board will go into diagnostic (debug) mode allowing for changes to settings to be made 
+and saved to EEPROM, in addition during operation debug messages will be sent to the serial console. 
+Once Setup has competed the on-board LED will go out and will flash briefly for each midi event processed. 
    
-  The scanner can be configured for 8x8 diode matrix keyboards such as those made by Fatar and the pinout is compatible with
-  commercial "FatBreak" connectors, or it can drive an 8x8 array of inexpensive ITR9606-F Opto-Switches. 
-  Alternatively the board can connect to 16 LED illuminated Piston buttons and uses an innovative approach to use 
-  a single GPIO pin to both operate the LED and read the push button switch.
-       
-  The board supports up to 3 expression pedals and can be configured for Linear or Logarithmic swell potentiometers 
-  or for my own custom designed and 3D printed expression pedals that use a time of flight distance sensor and require 
-  a tangent calculation to convert pedal height to pedal angle.
+The scanner can be configured for 8x8 diode matrix keyboards such as those made by Fatar and the pinout is compatible with
+commercial "FatBreak" connectors, or it can drive an 8x8 array of inexpensive ITR9606-F Opto-Switches. 
+Alternatively the board can connect to 16 LED illuminated Piston buttons and uses an innovative approach to use 
+a single GPIO pin to both operate the LED and read the push button switch.     
+The board supports up to 3 expression pedals and can be configured for Linear or Logarithmic swell potentiometers 
+or for my own custom designed and 3D printed expression pedals that use a time of flight distance sensor and require 
+a tangent calculation to convert pedal height to pedal angle.
+  
+The board should be compiled using the excellent arduino-pico core: https://github.com/earlephilhower/arduino-pico 
+remember to configure the compiler to use the Adafruit Tiny USB stack instead of the default Pico SDK USB Stack else compilation 
+will fail.
+  
+Both microcontroller cores of the RP2040 are used, the code is split between the microcontroller cores in an attempt to maximise
+performance.
 
-  The board should be compiled using the excellent arduino-pico core: https://github.com/earlephilhower/arduino-pico 
-  remember to configure the compiler to use the Adafruit Tiny USB stack instead of the default Pico SDK USB Stack else the compiler 
-  will fail.
-  Both microcontroller cores of the RP2040 are used, the code is split between the microcontroller cores in an attempt to maximise
-  performance.
+I2C BUS PINOUTS (10 way ribbon cable):
 
-  V7.1.0
-  * Many bugfixes and improvements
-  * Waits for 5 seconds for USB serial to connect at boot time  
-  * If an NRPN control change message is received by the master this will trigger a re-scan of any analogue controllers on all boards
-  * USB Midi now handles NRPN messages  
-  * The hardware I2C bus reset line (GPIO 22) has been removed the master now just sends I2C scan stop and restart commands to the slaves
-  * If no Ethernet hardware is detected or DHCP fails will default to USB Midi
-  * ethernet.maintain() is executed every 100mS as per guidelines this ensures DHCP renews seamlessly
-  * The code is distributed better over both cores of the RP2040 with most of the housekkeeping and I/O running on core 0
-    and the keyboard, piston and analogue controller scanning running on core 1
+Pin 1 +5V
+Pin 3 +5V
+Pin 5 Console relay driven by GPIO 22 on master scanner, previously used as a reset (run) signal on slaves
+Pin 7 I2C SDA
+Pin 9 I2C SCL
 
+Pins 2, 4, 6, 8 & 10 are connected to 0V (ground)
+
+V7.1.1
+* Various minor code improvements
+* GPIO 22 which had been used as a reset line for the slave controllers has now been repurposed as a relay driver output
+  on the master controller such that pressing any key or piston will turn on a relay which can be used to control console lighting.
+  The relay has a 5 minute re-triggerable timer
+* The analogue controller scan function has now been moved to Core 1 for consitency
+
+V7.1.0
+* Many bugfixes and improvements
+* Waits for 5 seconds for USB serial to connect at boot time in order to enter debug / congigure mode
+* If an NRPN control change message is received by the master this will trigger a re-scan of any analogue controllers on all boards
+* USB Midi now handles NRPN messages  
+* The hardware I2C bus reset line (GPIO 22) has been removed the master now just sends I2C scan stop and restart commands to the slaves
+* If no Ethernet hardware is detected or DHCP fails will default to USB Midi
+* ethernet.maintain() is executed every 100mS as per guidelines this ensures DHCP renews seamlessly
+* The code is distributed better over both cores of the RP2040 with most of the housekkeeping and I/O running on core 0
+  and the keyboard, piston and analogue controller scanning running on core 1
+   
 */
 
 #include "rp2040.h"  //Midi board V7a definitions for Raspberry Pi Pico Microcontroller
@@ -91,13 +111,14 @@ MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDI);
 //*********************************************************************************************
 //****                        Device defaults and setttings                                ****
 //*********************************************************************************************
-#define codeRev "V7.1.0"
+#define codeRev "V7.1.1"
 byte kbtype = 0;                     //Default Keyboard type, 0 = Matrix 1 = serial 2 = Optical 3 = Illuminated Pistons
 byte i2caddr = 0;                    //Default I2C device address
 byte chan = 1;                       //Default Midi Channel number
 byte swells = 0;                     //Default Number of expression inputs
 uint16_t nrpnOffset = 1000;          //NRPN Starting parameter number default = 1000
 #define velocity 127                 //Default Midi Velocity
+#define relayDelay 5 * 60 * 1000     //5 minute relay timer
 #define LedDelay 50                  //LED_BUILTIN Flash timer (mS)
 #define optoDelay 350                //Optical Keyboard scan row delay (uS)
 #define mechDelay 100                //Mechanical Keyboard scan row delay (uS)
@@ -160,10 +181,12 @@ unsigned long kbdTime;
 unsigned long pistonTime;
 unsigned long swellTime;
 unsigned long dhcpTime;
+unsigned long relayTime;
 unsigned long i2cTime;
 unsigned long ethTime;
 unsigned long LED_BUILTINTime;
 
+bool relaystat = false;
 int cc;
 int i2cfile[128];
 byte i2cchan[128];
@@ -329,7 +352,7 @@ void setup() {
       Serial.println("\nSelect Option:");
       Serial.printf("1. I2C Address: 0x%x\n\r", i2caddr);
       Serial.printf("2. Midi Channel: %d\n\r", chan);
-      Serial.printf("3. Calibrate Controllers \n\r");
+      Serial.printf("3. Calibrate Controllers\n\r");
       Serial.print("4. Type: ");
       switch (kbtype) {
         case 0:
@@ -424,7 +447,8 @@ void setup() {
   // ****    If I2c address = 0 then configure as master and start Ethernet or USBMidi.      ****
   //*********************************************************************************************
   if (i2caddr == 0) {  //If Master scanner then go ahead and setup Ethernet etc.
-
+    pinMode(relay, OUTPUT);
+    digitalWrite(relay, LOW);  //Setup Relay in Master mode
 
     //*********************************************************************************************
     //****                          Start Ethernet or USB Midi                                 ****
@@ -498,7 +522,7 @@ void setup() {
         i2cmax++;
       }
     }
-    if (debug == true) Serial.printf("\nFound %d additional slave I2C Midi Scanner modules\n\n\r", i2cmax);
+    if (debug == true) Serial.printf("\nFound %d additional slave I2C Midi Scanner module(s)\n\n\r", i2cmax);
 
 
     //*********************************************************************************************
@@ -525,7 +549,7 @@ void setup() {
           Serial.print("  No Keyboard    ");
           break;
       }
-      Serial.printf(" with %d Controllers\n\r", swells);
+      Serial.printf(" with %d Controller(s)\n\r", swells);
     }
 
     //Print slave information
@@ -557,7 +581,7 @@ void setup() {
             Serial.print("  Illuminated Pistons");
             break;
         }
-        Serial.printf(" with %d Controllers\n\r", (i2ctype[i2cctr] >> 3));
+        Serial.printf(" with %d Controller(s)\n\r", (i2ctype[i2cctr] >> 3));
       }
 
       //Send enable scan command
@@ -609,7 +633,7 @@ void setup() {
 
 
 //*********************************************************************************************
-//****     Main Loop Core 0 handles Ethernet, USB, I2C and analogue controller tasks       ****
+//****              Main Loop Core 0 handles Ethernet, USB and I2C tasks                   ****
 //*********************************************************************************************
 void loop() {
   if (i2caddr == 0) {
@@ -683,21 +707,18 @@ void loop() {
     }
   }
 
+
   //*********************************************************************************************
-  //****                        Scan Controllers if it's time                                ****
+  //****            Turn off Status LED or Relay if the timeout has expired                  ****
   //*********************************************************************************************
-  if (swells > 0) {
-    if (micros() < swellTime) swellTime = 0;
-    if (micros() > swellTime + swellDelay) {  //Is it time to scan the Analogue inputs?
-      swellTime = micros();                   //Store time Analogue scan started
-      scanSwell();                            //Scan analogue inputs
+  if (i2caddr == 0) {
+    if (millis() < relayTime) relayTime = 0;
+    if (relaystat == true && millis() > relayTime + relayDelay) {
+      digitalWrite(relay, LOW);
+      relaystat = false;
+      if (debug == true) Serial.println("Relay Off");
     }
   }
-
-  //*********************************************************************************************
-  //****                 Turn off Status LED if the timeout has expired                      ****
-  //*********************************************************************************************
-
   if (millis() > LED_BUILTINTime + LedDelay) {
     digitalWrite(LED_BUILTIN, ledOff);  //Turn LED off after a short delay
   }
@@ -705,7 +726,7 @@ void loop() {
 }  //End of loop 0
 
 //*********************************************************************************************
-//****                 Core 1 handles all keyboard and piston scanning                     ****
+//****      Core 1 handles all keyboard, piston and Analogue controller scanning           ****
 //*********************************************************************************************
 void setup1() {        //Core 1 setup, nothing to do here
   while (!scanning) {  //Wait for scanning to start
@@ -724,9 +745,9 @@ void loop1() {
 
   if (kbtype == 0 || kbtype == 2) {
     if (micros() < kbdTime) kbdTime = 0;
-    if (micros() > kbdTime + kbdDelay) {  //Is it time to scan the keyboard?
-      kbdTime = micros();                 //Store time keyboard scan started
-      rowidx = scanRow(keybuf, rowidx);   //Scan keyboard one row at a time (rowidx 0 to 7)
+    if (micros() > kbdTime + kbdDelay) {        //Is it time to scan the keyboard?
+      kbdTime = micros();                       //Store time keyboard scan started
+      rowidx = scanRow(keybuf, rowidx);         //Scan keyboard one row at a time (rowidx 0 to 7)
     }
   }
 
@@ -741,7 +762,16 @@ void loop1() {
       scanPistons();                            //Scan pistons
     }
   }
-
+  //*********************************************************************************************
+  //****                        Scan Controllers if it's time                                ****
+  //*********************************************************************************************
+  if (swells > 0) {
+    if (micros() < swellTime) swellTime = 0;
+    if (micros() > swellTime + swellDelay) {  //Is it time to scan the Analogue inputs?
+      swellTime = micros();                   //Store time Analogue scan started
+      scanSwell();                            //Scan analogue inputs
+    }
+  }
 
 }  //End of Loop 1
 
@@ -756,7 +786,7 @@ int scanRow(byte kbl[3][128], int r) {
   //read col GPIO pins into rawbuf
   int ki = (r * 8);
   if (kbtype == 2) {
-    kbl[0][ki] = digitalRead(pxlte[0]);  //No need to invert Optical switches
+    kbl[0][ki] = digitalRead(pxlte[0]);           //No need to invert Optical switches
     kbl[0][ki + 1] = digitalRead(cols[1]);
     kbl[0][ki + 2] = digitalRead(cols[2]);
     kbl[0][ki + 3] = digitalRead(cols[3]);
@@ -765,7 +795,7 @@ int scanRow(byte kbl[3][128], int r) {
     kbl[0][ki + 6] = digitalRead(cols[6]);
     kbl[0][ki + 7] = digitalRead(cols[7]);
   } else {  //Invert mechanical switches
-    kbl[0][ki]     = !digitalRead(cols[0]);
+    kbl[0][ki] = !digitalRead(cols[0]);
     kbl[0][ki + 1] = !digitalRead(cols[1]);
     kbl[0][ki + 2] = !digitalRead(cols[2]);
     kbl[0][ki + 3] = !digitalRead(cols[3]);
@@ -775,9 +805,9 @@ int scanRow(byte kbl[3][128], int r) {
     kbl[0][ki + 7] = !digitalRead(cols[7]);
   }
 
-  if (kbtype == 2 && r == 7) {  //phantom notes above top C off
-    kbl[0][61] = 0;             //If we are scanning an optical
-    kbl[0][62] = 0;             //Keyboard they need to be turned off
+  if (kbtype == 2 && r == 7) {                    //phantom notes above top C off
+    kbl[0][61] = 0;                               //If we are scanning an optical
+    kbl[0][62] = 0;                               //Keyboard they need to be turned off
     kbl[0][63] = 0;
   }
 
@@ -792,7 +822,7 @@ int scanRow(byte kbl[3][128], int r) {
   }
   digitalWrite(rows[r], LOW);
 
-  kProcess(kbl, ki, ki + 8, kbtype, chan);  //Process de-bounce and notes on and off
+  kProcess(kbl, ki, ki + 8, kbtype, chan);        //Process de-bounce and notes on and off
   return r;
 }
 
@@ -806,7 +836,7 @@ void scanPistons(void) {
     pinMode(pxlte[k], OUTPUT_4MA);                //Set GPIO back to output (4mA is ok for most illuminated buttons)
     digitalWrite(pxlte[k], bitRead(ledstat, k));  //Update LED to latest state
   }
-  kProcess(keybuf, 64, 80, 0, chan);  //De-Bounce and process new button status
+  kProcess(keybuf, 64, 80, 0, chan);              //De-Bounce and process new button status
 }
 
 //*********************************************************************************************
@@ -814,22 +844,22 @@ void scanPistons(void) {
 //*********************************************************************************************
 void kProcess(byte kbl[3][128], int k1, int k2, int k3, int c) {
   //Keyboard buffer pointer, Start Key, End Key, Keyboard type, Midi Channel
-  byte note;       //Midi Note value
-  int keyidx = 0;  //Key array index
+  byte note;                                                //Midi Note value
+  int keyidx = 0;                                           //Key array index
 
   //De-Bounce mechanical key switches
   for (keyidx = k1; keyidx < k2; keyidx++) {
-    if (kbl[0][keyidx] == 0) {  //Key pressed ?
+    if (kbl[0][keyidx] == 0) {                              //Key pressed ?
       //Key not pressed
-      if (kbl[1][keyidx] > 0) {                          //Is de-bounce count > 0
-        kbl[1][keyidx]--;                                //Decrement de-bounce count
-        if (k3 == 2 && keyidx < 61) kbl[1][keyidx] = 1;  //Optical keyboard = no de-bounce
+      if (kbl[1][keyidx] > 0) {                             //Is de-bounce count > 0
+        kbl[1][keyidx]--;                                   //Decrement de-bounce count
+        if (k3 == 2 && keyidx < 61) kbl[1][keyidx] = 1;     //Optical keyboard = no de-bounce
       }
     } else {
       //key pressed
       if (kbl[1][keyidx] < 2) {
         kbl[1][keyidx]++;
-        if (k3 == 2 && keyidx < 61) kbl[1][keyidx] = 2;  //Optical keyboard = no de-bounce
+        if (k3 == 2 && keyidx < 61) kbl[1][keyidx] = 2;     //Optical keyboard = no de-bounce
       }
     }
 
@@ -861,21 +891,21 @@ void receiveEvent(int howMany) {
   while (1 < Wire.available()) {  //loop through all but the last byte
     rxa = Wire.read();            //receive byte
   }
-  rxb = Wire.read();  //receive last byte
+  rxb = Wire.read();              //receive last byte
 
   if (rxa == 0 && rxb == 0) {
     if (debug == true) Serial.println("Scanning halted by Master");
     scanning = false;
-    i2coutidx = 0;  //Reset I2C buffer
+    i2coutidx = 0;                //Reset I2C buffer
     i2cinidx = 0;
   }
-  if (rxa == 1 && rxb == 0) {  //Restart requested by master
+  if (rxa == 1 && rxb == 0) {     //Restart requested by master
     if (debug == true) Serial.println("Scanning restarted by Master");
     scanning = true;
-    Oswell[0] = 128;  //force re-scan of all swell contollers
+    Oswell[0] = 128;              //force re-scan of all swell contollers
     Oswell[1] = 128;
     Oswell[2] = 128;
-    Oswell[3] = 128;  //Not needed on the pico but retained for future use
+    Oswell[3] = 128;              //Not needed on the pico but retained for future use
   }
 
   //Use received contoller values to turn on and off Piston LEDs
@@ -889,7 +919,7 @@ void receiveEvent(int howMany) {
     } else {
       bitWrite(ledstat, rxa - 20, 0);
     }
-  } 
+  }
 }
 
 
@@ -899,10 +929,10 @@ void receiveEvent(int howMany) {
 //*********************************************************************************************
 void requestEvent() {
   byte buf[2];
-  if (rxa + rxb == 0) i2coutidx = i2cinidx;  //if in reset state reset buffer
-  if (i2cinidx == i2coutidx) {               //If buffer empty return Midi channel plus scanner capabilities                                       //Bits 3 and 4 show swell count
+  if (rxa + rxb == 0) i2coutidx = i2cinidx;             //if in reset state reset buffer
+  if (i2cinidx == i2coutidx) {                          //If buffer empty return Midi channel plus scanner capabilities                                       //Bits 3 and 4 show swell count
     buf[0] = chan;
-    buf[1] = type;  //return scanner capabilities
+    buf[1] = type;                                      //return scanner capabilities
   } else {
     buf[0] = i2cbuf[0][i2coutidx];
     buf[1] = i2cbuf[1][i2coutidx];
@@ -921,19 +951,19 @@ void pollScanners() {
   for (i2cctr = 0; i2cctr < i2cmax; i2cctr++) {
     bool more = 1;
     while (more == 1) {
-      Wire.requestFrom(i2cfile[i2cctr], 2);  //request 2 bytes from slave device
+      Wire.requestFrom(i2cfile[i2cctr], 2);   //request 2 bytes from slave device
       if (Wire.available()) rxa = Wire.read();
       if (Wire.available()) rxb = Wire.read();
       more = 0;
-      if (rxa >= 0x80) more = 1;         //if MSB of a is 1 then the buffer isn't empty
-      rxa = rxa & 0x7f;                  //mask off the buffer bit
-      ch = i2cchan[i2cctr];              //Recover the channel number
-      if (rxa > 15) {                    //Is message valid
-        if (rxa < 0x40) rxa = rxa - 16;  //Swell controllers start at 0
+      if (rxa >= 0x80) more = 1;              //if MSB of a is 1 then the buffer isn't empty
+      rxa = rxa & 0x7f;                       //mask off the buffer bit
+      ch = i2cchan[i2cctr];                   //Recover the channel number
+      if (rxa > 15) {                         //Is message valid
+        if (rxa < 0x40) rxa = rxa - 16;       //Swell controllers start at 0
         masterSend(rxa, rxb, ch);
       }
     }
-  }  //Next I2C scanner
+  }                                           //Next I2C scanner
 }
 
 
@@ -943,7 +973,7 @@ void pollScanners() {
 //*********************************************************************************************
 void restartScanners() {
   for (i2cctr = 0; i2cctr < i2cmax; i2cctr++) {
-    //Send enable scan command
+                              //Send enable scan command
     Wire.beginTransmission(i2cfile[i2cctr]);
     Wire.write(1);
     Wire.write(0);
@@ -959,32 +989,33 @@ void masterSend(byte rxa, byte rxb, byte ch) {
   byte a;
   byte b;
   byte c;
-  digitalWrite(LED_BUILTIN, ledOn);  //Turn on LED_BUILTIN
+  digitalWrite(LED_BUILTIN, ledOn);           //Turn on LED_BUILTIN
   LED_BUILTINTime = millis();
   switch (rxa) {
-    case 0x40:  //Note off
+    case 0x40:                                //Note off
       a = 0x80 | ch;
       b = rxb;
       c = velocity;
       if (debug == true) Serial.printf("TX Note Off\t%d\t%d\t%d\n\r", ch, b, c);
       break;
-    case 0x41:  //Note on
+    case 0x41:                                //Note on
       a = 0x90 | ch;
       b = rxb;
       c = velocity;
       if (debug == true) Serial.printf("TX Note On\t%d\t%d\t%d\n\r", ch, b, c);
+      relayOn();                              //Turn relay on
       break;
-    case 0x42:  //Program change not currently used
+    case 0x42:                                //Program change not currently used
       a = 0xC0 | ch;
       b = rxb;
       c = 0xff;
       if (debug == true) Serial.printf("TX Program\t%d\t%d\n\r", ch, b);
       break;
     default:
-      a = 0xB0 | ch;  //Controller value
+      a = 0xB0 | ch;                          //Controller value
       b = rxa;
       c = rxb;
-      uint16_t n = b + nrpnOffset;  //Calculate the NRPN register number, the first 4 are reservered for swell pedals
+      uint16_t n = b + nrpnOffset;            //Calculate the NRPN register number, the first 4 are reservered for swell pedals
       if (debug == true) Serial.printf("TX NRPN\t\t%d\t%d\t%d\n\r", ch, n, c);
       tx_bufferWrite(a, 99, n >> 7);          //Write NRPN High byte to output buffer
       tx_bufferWrite(a, 98, n & 0x7f);        //Write NRPN Low byte to output buffer
@@ -993,9 +1024,10 @@ void masterSend(byte rxa, byte rxb, byte ch) {
         Oswell[0] = 128;                      //force master to re-scan swell contollers
         Oswell[1] = 128;
         Oswell[2] = 128;
-        Oswell[3] = 128;  //Not needed on the Pico but retained for future use
+        Oswell[3] = 128;                      //Not needed on the Pico but retained for future use
+        relayOn();                            //Turn relay on
       }
-      b = 6;  //NRPN data register
+      b = 6;                                  //NRPN data register
   }
   if (rxa < 48) rxa = rxa + 16;  //if it's a contoller command add 16 to allow for a range of 16-63 (0-47)
   tx_bufferWrite(a, b, c);       //Write to midi buffer
@@ -1303,6 +1335,10 @@ void IPmidiReceive(void) {
     for (int pii = 0; pii < packetSize; pii++) {
 
       if (packetBuffer[pii] > 127) {
+
+        //if Note On, Off or Program change turn relay on
+        if ((packetBuffer[pii] & 0xF0) == 0x90 || (packetBuffer[pii] & 0xF0) == 0xC0) relayOn(); //Turn relay on
+
         //Process Controller change message
         if ((packetBuffer[pii] & 0xF0) == 0xB0) {
           uint8_t ch = (packetBuffer[pii] & 0x0F);
@@ -1326,7 +1362,9 @@ void IPmidiReceive(void) {
             }
 
             if (debug == true) Serial.printf("RX NPRN\t\t%d\t%d\t%d\n\r", ch, n, par2);
+            //if controller change for Piston turn relay on
             if (n > nrpnOffset + 3 && n < nrpnOffset + 36) {
+              relayOn();  //Turn relay on
               //Uodate illuminated pistons if the channel matches
               if (ch == chan) {
                 if (par2 == 0) {
@@ -1404,5 +1442,19 @@ void handleCC(byte ch, byte par1, byte par2) {
         }
       }
     }
+  }
+}
+
+//*********************************************************************************************
+//****                Function to turn relay on if it isn't already                        ****
+//*********************************************************************************************
+void relayOn() {
+  if (i2caddr == 0) {
+    if (relaystat == false) {
+      digitalWrite(relay, HIGH);
+      relaystat = true;
+      if (debug == true) Serial.println("Relay On");
+    }
+    relayTime = millis();
   }
 }

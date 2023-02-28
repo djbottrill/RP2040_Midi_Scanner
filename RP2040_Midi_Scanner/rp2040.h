@@ -6,7 +6,7 @@
 #define I2CSDA 0              //I2C BUS pins
 #define I2CSCL 1
 
-#define i2cReset 22           //Bus Reset in Master Mode - no longer used
+#define relay  22             //Relay output (was Bus Reset) in Master Mode used to drive console lights
 
 #define maxSwells 3           //Maximum number of swell inputs
 #define swell0 26             //Swell controller inputs
