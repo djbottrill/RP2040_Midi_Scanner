@@ -10,7 +10,7 @@ Midi Scanner based on the Raspberry Pi Pico
   The I2C bus is configured to run at 4MHz to reduce latency and the polling interval can be changed in 
   the default settings section if required.
   
-  The hardware is designed to connect the boards via a 10 way ribbon cable with odd cables being ground. The hardare has been tested
+  The hardware is designed to connect the boards via a 10 way ribbon cable with even cables being ground. The hardare has been tested
   with ribbon cables of up to 4M length without problems, I2C pullup resistors of 10K ohms and fitted on each scanner board.
   
   I2C protocol polls slave devices for 2 bytes at a time if the buffer is empty the slave returns
